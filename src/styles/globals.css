@@ -1,19 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:wght@400;500;600;700&display=swap');
 
-:root {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-card: #0f0f23;
-  --accent: #e94560;
-  --accent-hover: #ff6b6b;
-  --text-primary: #eaeaea;
-  --text-secondary: #a0a0a0;
-  --border: #2a2a4a;
-  --owned: #4ade80;
-  --wish: #f59e0b;
-  --radius: 8px;
-  --radius-lg: 12px;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 * {
   box-sizing: border-box;
@@ -23,8 +12,8 @@
 
 body {
   font-family: 'DM Sans', sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: #1a1a2e;
+  color: #eaeaea;
   min-height: 100vh;
 }
 

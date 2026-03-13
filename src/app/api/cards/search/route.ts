@@ -6,9 +6,11 @@ export async function GET(request: Request) {
   const set = searchParams.get("set");
   const localId = searchParams.get("localId");
   const rarity = searchParams.get("rarity");
+  const page = parseInt(searchParams.get("page") || "1", 10);
+  const limit = parseInt(searchParams.get("limit") || "20", 10);
 
   if (!query || query.length < 1) {
-    return NextResponse.json([]);
+    return NextResponse.json({ cards: [], total: 0 });
   }
 
   let url = `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(query)}`;
@@ -26,12 +28,16 @@ export async function GET(request: Request) {
     const response = await fetch(url);
 
     if (!response.ok) {
-      return NextResponse.json([]);
+      return NextResponse.json({ cards: [], total: 0 });
     }
 
-    const cards = await response.json();
+    const allCards = await response.json();
+    const total = allCards.length;
+    
+    const startIndex = (page - 1) * limit;
+    const paginatedCards = allCards.slice(startIndex, startIndex + limit);
 
-    const simplifiedCards = cards.slice(0, 20).map((card: any) => ({
+    const simplifiedCards = paginatedCards.map((card: any) => ({
       id: card.id,
       name: card.name,
       imageUrl: card.image ? `${card.image}/high.webp` : null,
@@ -39,8 +45,8 @@ export async function GET(request: Request) {
       setId: card.set?.id,
     }));
 
-    return NextResponse.json(simplifiedCards);
+    return NextResponse.json({ cards: simplifiedCards, total });
   } catch (error) {
-    return NextResponse.json([]);
+    return NextResponse.json({ cards: [], total: 0 });
   }
 }
