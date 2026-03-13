@@ -1,0 +1,836 @@
+"use client";
+
+import { useSession, signOut } from "next-auth/react";
+import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+
+interface CardSlot {
+  id: string;
+  pageNumber: number;
+  slotIndex: number;
+  pokemonId: string | null;
+  cardName: string | null;
+  cardImageUrl: string | null;
+  status: string;
+}
+
+interface Binder {
+  id: string;
+  name: string;
+  rows: number;
+  cols: number;
+  pages: number;
+  cards: CardSlot[];
+}
+
+interface SearchResult {
+  id: string;
+  name: string;
+  imageUrl: string;
+  set: string;
+  setId?: string;
+}
+
+export default function BinderPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const params = useParams();
+  const [binder, setBinder] = useState<Binder | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{ page: number; index: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [setFilter, setSetFilter] = useState("");
+  const [localIdFilter, setLocalIdFilter] = useState("");
+  const [rarityFilter, setRarityFilter] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [cardStatus, setCardStatus] = useState("owned");
+  const [showSettings, setShowSettings] = useState(false);
+  const [editingCard, setEditingCard] = useState<CardSlot | null>(null);
+
+  const rarities = [
+    { label: "Common", value: "common" },
+    { label: "Uncommon", value: "uncommon" },
+    { label: "Rare", value: "rare" },
+    { label: "Holo Rare", value: "holo" },
+    { label: "Ultra Rare", value: "ultra" },
+    { label: "Illustration Rare", value: "illustration" },
+    { label: "Special Illustration Rare", value: "special illustration" },
+    { label: "Secret Rare", value: "secret" },
+    { label: "Shiny Rare", value: "shiny" },
+    { label: "Radiant Rare", value: "radiant" },
+    { label: "Amazing Rare", value: "amazing" },
+  ];
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/");
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    if (status === "authenticated" && params.id) {
+      fetchBinder();
+    }
+  }, [status, params.id]);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const fetchBinder = async () => {
+    const id = params.id;
+    if (!id) return;
+    const res = await fetch(`/api/binders/${id}`);
+    if (res.ok) {
+      const data = await res.json();
+      setBinder(data);
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
+  const handleSlotClick = (page: number, index: number) => {
+    const existingCard = binder?.cards.find(
+      (c) => c.pageNumber === page && c.slotIndex === index
+    );
+    setSelectedSlot({ page, index });
+    setEditingCard(existingCard || null);
+    setCardStatus(existingCard?.status || "owned");
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowModal(true);
+  };
+
+  const toggleCardStatus = async () => {
+    if (!editingCard || !binder) return;
+    const newStatus = editingCard.status === "owned" ? "wish" : "owned";
+    await fetch(`/api/binders/${binder.id}/cards/${editingCard.pageNumber}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pageNumber: editingCard.pageNumber,
+        slotIndex: editingCard.slotIndex,
+        pokemonId: editingCard.pokemonId,
+        cardName: editingCard.cardName,
+        cardImageUrl: editingCard.cardImageUrl,
+        status: newStatus,
+      }),
+    });
+    setEditingCard({ ...editingCard, status: newStatus });
+    setCardStatus(newStatus);
+    fetchBinder();
+  };
+
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const searchCards = async (query: string) => {
+    setSearchQuery(query);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    if (query.length < 1) {
+      setSearchResults([]);
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(async () => {
+      let url = `/api/cards/search?q=${encodeURIComponent(query)}`;
+      if (setFilter) {
+        url += `&set=${encodeURIComponent(setFilter)}`;
+      }
+      if (localIdFilter) {
+        url += `&localId=${encodeURIComponent(localIdFilter)}`;
+      }
+      if (rarityFilter) {
+        url += `&rarity=${encodeURIComponent(rarityFilter)}`;
+      }
+      const res = await fetch(url);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSearchResults(data);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+  };
+
+  const handleSetFilterChange = (value: string) => {
+    setSetFilter(value);
+    if (searchQuery) {
+      searchCards(searchQuery);
+    }
+  };
+
+  const handleLocalIdChange = (value: string) => {
+    setLocalIdFilter(value);
+    if (searchQuery) {
+      searchCards(searchQuery);
+    }
+  };
+
+  const handleRarityChange = (value: string) => {
+    setRarityFilter(value);
+    if (searchQuery) {
+      searchCards(searchQuery);
+    }
+  };
+
+  const addCard = async (card: SearchResult) => {
+    if (!selectedSlot || !binder) return;
+    await fetch(`/api/binders/${binder.id}/cards/${selectedSlot.page}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pageNumber: selectedSlot.page,
+        slotIndex: selectedSlot.index,
+        pokemonId: card.id,
+        cardName: card.name,
+        cardImageUrl: card.imageUrl,
+        status: cardStatus,
+      }),
+    });
+    setShowModal(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    fetchBinder();
+  };
+
+  const removeCard = async (slotId: string) => {
+    if (!binder) return;
+    await fetch(`/api/binders/${binder.id}/cards/${slotId}`, {
+      method: "DELETE",
+    });
+    fetchBinder();
+  };
+
+  const updateBinderSettings = async (newSettings: Partial<Binder>) => {
+    if (!binder) return;
+    await fetch(`/api/binders/${binder.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...binder, ...newSettings }),
+    });
+    fetchBinder();
+    setShowSettings(false);
+  };
+
+  const deleteBinder = async () => {
+    if (!binder || !confirm("Delete this binder?")) return;
+    await fetch(`/api/binders/${binder.id}`, { method: "DELETE" });
+    router.push("/dashboard");
+  };
+
+  if (status === "loading" || !binder) {
+    return <div style={styles.container}><p>Loading...</p></div>;
+  }
+
+  if (status === "unauthenticated") {
+    return null;
+  }
+
+  const totalSlots = binder.rows * binder.cols;
+  const leftPage = currentPage;
+  const rightPage = currentPage + 1;
+  const leftPageCards = binder.cards.filter((c) => c.pageNumber === leftPage);
+  const rightPageCards = binder.cards.filter((c) => c.pageNumber === rightPage);
+
+  return (
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <div style={styles.headerLeft}>
+          <button onClick={() => router.push("/dashboard")} style={styles.backBtn}>
+            ← Back
+          </button>
+          <h1 style={styles.title}>{binder.name}</h1>
+        </div>
+        <div style={styles.headerRight}>
+          <button onClick={() => setShowSettings(true)} style={styles.settingsBtn}>
+            ⚙ Settings
+          </button>
+          {session?.user?.image && (
+            <img src={session.user.image} alt="" style={styles.avatar} />
+          )}
+          <button onClick={() => signOut()} style={styles.signOutBtn}>
+            Sign Out
+          </button>
+        </div>
+      </header>
+
+      <main style={styles.main}>
+        <div style={styles.pageNav}>
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 2))}
+            disabled={currentPage === 1}
+            style={styles.navBtn}
+          >
+            ← Prev
+          </button>
+          <span style={styles.pageInfo}>
+            Pages {leftPage}-{rightPage > binder.pages ? binder.pages : rightPage} of {binder.pages}
+          </span>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(binder.pages, p + 2))}
+            disabled={rightPage >= binder.pages}
+            style={styles.navBtn}
+          >
+            Next →
+          </button>
+        </div>
+
+        <div style={styles.spread}>
+          <div style={styles.pageContainer}>
+            <div style={styles.pageLabel}>Page {leftPage}</div>
+            <div
+              style={{
+                ...styles.grid,
+                gridTemplateColumns: `repeat(${binder.cols}, 1fr)`,
+              }}
+            >
+              {Array.from({ length: totalSlots }).map((_, index) => {
+                const card = leftPageCards.find((c) => c.slotIndex === index);
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      ...styles.slot,
+                      borderColor: card
+                        ? card.status === "owned"
+                          ? "var(--owned)"
+                          : "var(--wish)"
+                        : "var(--border)",
+                      borderStyle: card && card.status === "wish" ? "dashed" : "solid",
+                    }}
+                    onClick={() => handleSlotClick(leftPage, index)}
+                  >
+                    {card ? (
+                      <div style={styles.cardWrapper}>
+                        <img
+                          src={card.cardImageUrl || ""}
+                          alt={card.cardName || ""}
+                          style={{
+                            ...styles.cardImage,
+                            opacity: card.status === "wish" ? 0.5 : 1,
+                          }}
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeCard(card.id);
+                        }}
+                        style={styles.removeBtn}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={styles.plus}>+</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {rightPage <= binder.pages && (
+          <div style={styles.pageContainer}>
+            <div style={styles.pageLabel}>Page {rightPage}</div>
+            <div
+              style={{
+                ...styles.grid,
+                gridTemplateColumns: `repeat(${binder.cols}, 1fr)`,
+              }}
+            >
+              {Array.from({ length: totalSlots }).map((_, index) => {
+                const card = rightPageCards.find((c) => c.slotIndex === index);
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      ...styles.slot,
+                      borderColor: card
+                        ? card.status === "owned"
+                          ? "var(--owned)"
+                          : "var(--wish)"
+                        : "var(--border)",
+                      borderStyle: card && card.status === "wish" ? "dashed" : "solid",
+                    }}
+                    onClick={() => handleSlotClick(rightPage, index)}
+                  >
+                    {card ? (
+                      <div style={styles.cardWrapper}>
+                        <img
+                          src={card.cardImageUrl || ""}
+                          alt={card.cardName || ""}
+                          style={{
+                            ...styles.cardImage,
+                            opacity: card.status === "wish" ? 0.5 : 1,
+                          }}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeCard(card.id);
+                          }}
+                          style={styles.removeBtn}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={styles.plus}>+</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+
+      {showModal && (
+        <div style={styles.modalOverlay} onClick={() => { setShowModal(false); setEditingCard(null); }}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            {editingCard ? (
+              <div style={{ textAlign: "center" }}>
+                <h3 style={{ marginBottom: "16px" }}>{editingCard.cardName}</h3>
+                <div style={{ marginBottom: "20px" }}>
+                  <img 
+                    src={editingCard.cardImageUrl || ""} 
+                    alt={editingCard.cardName || ""} 
+                    style={{ maxWidth: "200px", maxHeight: "280px", borderRadius: "8px" }} 
+                  />
+                </div>
+                <button
+                  onClick={toggleCardStatus}
+                  style={{
+                    ...styles.statusBtn,
+                    width: "100%",
+                    marginBottom: "12px",
+                    background: editingCard.status === "owned" ? "var(--owned)" : "var(--wish)",
+                  }}
+                >
+                  {editingCard.status === "owned" ? "I Have (Owned) ✓" : "I Wish ✗"}
+                </button>
+                <button 
+                  onClick={() => {
+                    removeCard(editingCard.id);
+                    setShowModal(false);
+                    setEditingCard(null);
+                  }} 
+                  style={{ ...styles.deleteBtn, width: "100%" }}
+                >
+                  Remove Card
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3>Add Card</h3>
+            <input
+              type="text"
+              placeholder="Search Pokemon cards..."
+              value={searchQuery}
+              onChange={(e) => searchCards(e.target.value)}
+              style={styles.searchInput}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="Set (e.g. swsh)..."
+                value={setFilter}
+                onChange={(e) => handleSetFilterChange(e.target.value)}
+                style={{ ...styles.searchInput, flex: 1 }}
+              />
+              <input
+                type="text"
+                placeholder="Card #..."
+                value={localIdFilter}
+                onChange={(e) => handleLocalIdChange(e.target.value)}
+                style={{ ...styles.searchInput, width: '80px' }}
+              />
+              <select
+                value={rarityFilter}
+                onChange={(e) => handleRarityChange(e.target.value)}
+                style={{ ...styles.searchInput, width: '140px' }}
+              >
+                <option value="">Any Rarity</option>
+                {rarities.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={styles.statusToggle}>
+              <button
+                onClick={() => setCardStatus("owned")}
+                style={{
+                  ...styles.statusBtn,
+                  background: cardStatus === "owned" ? "var(--owned)" : "transparent",
+                }}
+              >
+                I Have
+              </button>
+              <button
+                onClick={() => setCardStatus("wish")}
+                style={{
+                  ...styles.statusBtn,
+                  background: cardStatus === "wish" ? "var(--wish)" : "transparent",
+                }}
+              >
+                I Wish
+              </button>
+            </div>
+            <div style={styles.results}>
+              {searchResults.map((card) => (
+                <div
+                  key={card.id}
+                  style={styles.resultItem}
+                  onClick={() => addCard(card)}
+                >
+                  <img src={card.imageUrl} alt={card.name} style={styles.resultImg} />
+                  <div>
+                    <p style={styles.resultName}>{card.name}</p>
+                    <p style={styles.resultSet}>{card.setId} #{card.set}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showSettings && (
+        <div style={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3>Binder Settings</h3>
+            <label style={styles.label}>
+              Name:
+              <input
+                type="text"
+                value={binder.name}
+                onChange={(e) => setBinder({ ...binder, name: e.target.value })}
+                style={styles.input}
+              />
+            </label>
+            <div style={styles.row}>
+              <label style={styles.label}>
+                Rows:
+                <input
+                  type="number"
+                  value={binder.rows}
+                  onChange={(e) => setBinder({ ...binder, rows: parseInt(e.target.value) || 4 })}
+                  style={styles.smallInput}
+                />
+              </label>
+              <label style={styles.label}>
+                Cols:
+                <input
+                  type="number"
+                  value={binder.cols}
+                  onChange={(e) => setBinder({ ...binder, cols: parseInt(e.target.value) || 4 })}
+                  style={styles.smallInput}
+                />
+              </label>
+              <label style={styles.label}>
+                Pages:
+                <input
+                  type="number"
+                  value={binder.pages}
+                  onChange={(e) => setBinder({ ...binder, pages: parseInt(e.target.value) || 10 })}
+                  style={styles.smallInput}
+                />
+              </label>
+            </div>
+            <div style={styles.modalActions}>
+              <button onClick={deleteBinder} style={styles.deleteBtn}>
+                Delete Binder
+              </button>
+              <button
+                onClick={() => updateBinderSettings(binder)}
+                style={styles.saveBtn}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const styles: { [key: string]: React.CSSProperties } = {
+  container: {
+    minHeight: "100vh",
+    padding: "24px",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "24px",
+  },
+  headerLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+  headerRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  backBtn: {
+    background: "transparent",
+    border: "none",
+    color: "var(--text-secondary)",
+    fontSize: "16px",
+    cursor: "pointer",
+  },
+  title: {
+    fontSize: "24px",
+  },
+  settingsBtn: {
+    background: "transparent",
+    border: "1px solid var(--border)",
+    color: "var(--text-secondary)",
+    padding: "8px 16px",
+    borderRadius: "var(--radius)",
+    cursor: "pointer",
+  },
+  avatar: {
+    width: "36px",
+    height: "36px",
+    borderRadius: "50%",
+  },
+  signOutBtn: {
+    background: "transparent",
+    border: "1px solid var(--border)",
+    color: "var(--text-secondary)",
+    padding: "8px 16px",
+    borderRadius: "var(--radius)",
+    cursor: "pointer",
+  },
+  main: {
+    maxWidth: "1400px",
+    margin: "0 auto",
+    width: "100%",
+  },
+  pageNav: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "24px",
+    marginBottom: "24px",
+  },
+  navBtn: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    color: "var(--text-primary)",
+    padding: "10px 20px",
+    borderRadius: "var(--radius)",
+    cursor: "pointer",
+  },
+  pageInfo: {
+    fontSize: "18px",
+    fontWeight: 600,
+  },
+  spread: {
+    display: "flex",
+    gap: "24px",
+    justifyContent: "center",
+    flexWrap: "nowrap",
+  },
+  pageContainer: {
+    flex: "0 0 auto",
+    width: "calc(50% - 12px)",
+    maxWidth: "600px",
+  },
+  pageLabel: {
+    textAlign: "center",
+    marginBottom: "12px",
+    fontWeight: 600,
+    color: "var(--text-secondary)",
+  },
+  grid: {
+    display: "grid",
+    gap: "12px",
+    background: "var(--bg-card)",
+    padding: "24px",
+    borderRadius: "var(--radius-lg)",
+    border: "1px solid var(--border)",
+  },
+  slot: {
+    aspectRatio: "5/7",
+    background: "var(--bg-secondary)",
+    borderRadius: "var(--radius)",
+    borderWidth: "2px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    position: "relative",
+    overflow: "hidden",
+    transition: "transform 0.2s",
+  },
+  plus: {
+    fontSize: "32px",
+    color: "var(--text-secondary)",
+    opacity: 0.5,
+  },
+  cardWrapper: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  },
+  cardImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "6px",
+  },
+  removeBtn: {
+    position: "absolute",
+    top: "4px",
+    right: "4px",
+    background: "rgba(0,0,0,0.7)",
+    border: "none",
+    color: "white",
+    width: "24px",
+    height: "24px",
+    borderRadius: "50%",
+    cursor: "pointer",
+    fontSize: "18px",
+    lineHeight: 1,
+  },
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.8)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
+  },
+  modal: {
+    background: "var(--bg-secondary)",
+    padding: "24px",
+    borderRadius: "var(--radius-lg)",
+    width: "500px",
+    maxWidth: "90%",
+    maxHeight: "80vh",
+    overflow: "auto",
+  },
+  searchInput: {
+    width: "100%",
+    padding: "12px",
+    margin: "16px 0",
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius)",
+    color: "var(--text-primary)",
+    fontSize: "16px",
+  },
+  statusToggle: {
+    display: "flex",
+    gap: "8px",
+    marginBottom: "16px",
+  },
+  statusBtn: {
+    flex: 1,
+    padding: "10px",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius)",
+    color: "var(--text-primary)",
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+  results: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    maxHeight: "300px",
+    overflow: "auto",
+  },
+  resultItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "8px",
+    background: "var(--bg-card)",
+    borderRadius: "var(--radius)",
+    cursor: "pointer",
+    transition: "background 0.2s",
+  },
+  resultImg: {
+    width: "48px",
+    height: "68px",
+    objectFit: "contain",
+    borderRadius: "4px",
+  },
+  resultName: {
+    fontWeight: 600,
+    fontSize: "14px",
+  },
+  resultSet: {
+    color: "var(--text-secondary)",
+    fontSize: "12px",
+  },
+  label: {
+    display: "block",
+    marginBottom: "16px",
+    fontSize: "14px",
+  },
+  input: {
+    width: "100%",
+    padding: "10px",
+    marginTop: "4px",
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius)",
+    color: "var(--text-primary)",
+    fontSize: "14px",
+  },
+  row: {
+    display: "flex",
+    gap: "16px",
+    marginBottom: "24px",
+  },
+  smallInput: {
+    width: "60px",
+    padding: "8px",
+    marginLeft: "8px",
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius)",
+    color: "var(--text-primary)",
+    fontSize: "14px",
+  },
+  modalActions: {
+    display: "flex",
+    gap: "12px",
+    justifyContent: "space-between",
+  },
+  deleteBtn: {
+    background: "#dc2626",
+    border: "none",
+    color: "white",
+    padding: "10px 20px",
+    borderRadius: "var(--radius)",
+    cursor: "pointer",
+  },
+  saveBtn: {
+    background: "var(--accent)",
+    border: "none",
+    color: "white",
+    padding: "10px 20px",
+    borderRadius: "var(--radius)",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+};
