@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface CardSlot {
   id: string;
@@ -316,9 +317,7 @@ export default function BinderPage() {
           <button onClick={() => setShowSettings(true)} className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-4 py-2 rounded-lg cursor-pointer">
             ⚙ Settings
           </button>
-          {session?.user?.image && (
-            <img src={session.user.image} alt="" className="w-9 h-9 rounded-full" />
-          )}
+          <UserAvatar name={session?.user?.name || session?.user?.email} className="w-9 h-9" />
           <button onClick={() => signOut()} className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-4 py-2 rounded-lg cursor-pointer">
             Sign Out
           </button>
@@ -532,21 +531,22 @@ export default function BinderPage() {
                   ))}
                 </select>
               </div>
-              <div className="flex gap-2 mb-6">
-                <button
-                  onClick={() => setCardStatus("owned")}
-                  className={`flex-1 p-2.5 rounded-lg border font-semibold transition-colors ${cardStatus === "owned" ? "bg-green-500 border-green-500 text-white" : "bg-transparent border-gray-600 text-gray-300 hover:border-green-500"}`}
-                >
-                  I Have
-                </button>
-                <button
-                  onClick={() => setCardStatus("wish")}
-                  className={`flex-1 p-2.5 rounded-lg border font-semibold transition-colors ${cardStatus === "wish" ? "bg-amber-500 border-amber-500 text-white" : "bg-transparent border-gray-600 text-gray-300 hover:border-amber-500"}`}
-                >
-                  I Wish
-                </button>
-              </div>
-              
+              {!editingCard && (
+                <div className="flex gap-2 mb-6">
+                  <button
+                    onClick={() => setCardStatus("owned")}
+                    className={`flex-1 p-2.5 rounded-lg border font-semibold transition-colors ${cardStatus === "owned" ? "bg-green-500 border-green-500 text-white" : "bg-transparent border-gray-600 text-gray-300 hover:border-green-500"}`}
+                  >
+                    I Have
+                  </button>
+                  <button
+                    onClick={() => setCardStatus("wish")}
+                    className={`flex-1 p-2.5 rounded-lg border font-semibold transition-colors ${cardStatus === "wish" ? "bg-amber-500 border-amber-500 text-white" : "bg-transparent border-gray-600 text-gray-300 hover:border-amber-500"}`}
+                  >
+                    I Wish
+                  </button>
+                </div>
+              )}              
               {isSearching ? (
                 <div className="text-center py-8 text-gray-400">Searching...</div>
               ) : (

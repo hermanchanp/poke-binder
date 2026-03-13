@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 export default function SharedBinderView({ binder }: { binder: any }) {
   const router = useRouter();
@@ -24,9 +25,7 @@ export default function SharedBinderView({ binder }: { binder: any }) {
         </div>
         <div className="flex items-center gap-3 text-gray-400">
           <span className="text-sm">Created by {binder.user?.name || 'Anonymous'}</span>
-          {binder.user?.image && (
-            <img src={binder.user.image} alt="" className="w-9 h-9 rounded-full" />
-          )}
+          <UserAvatar name={binder.user?.name || binder.user?.email || 'Anonymous'} className="w-9 h-9" />
         </div>
       </header>
 

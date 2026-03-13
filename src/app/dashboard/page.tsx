@@ -3,6 +3,7 @@
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface Binder {
   id: string;
@@ -84,9 +85,7 @@ export default function Dashboard() {
           PokeBinder
         </h1>
         <div className="flex items-center gap-4">
-          {session?.user?.image && (
-            <img src={session.user.image} alt="" className="w-10 h-10 rounded-full" />
-          )}
+          <UserAvatar name={session?.user?.name || session?.user?.email} className="w-10 h-10" />
           <button 
             onClick={() => signOut()} 
             className="bg-transparent border border-gray-700 text-gray-400 px-4 py-2 rounded-lg hover:text-white transition-colors cursor-pointer"
