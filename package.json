@@ -12,6 +12,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.4.1",
     "@prisma/client": "^5.16.1",
+    "mobile-drag-drop": "^3.0.0-rc.0",
     "next": "^16.1.6",
     "next-auth": "^4.24.7",
     "prisma": "^5.16.1",

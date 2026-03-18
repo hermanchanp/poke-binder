@@ -4,6 +4,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import "mobile-drag-drop/default.css";
 
 interface CardSlot {
   id: string;
@@ -84,11 +85,29 @@ export default function BinderPage() {
   }, [status, params.id]);
 
   useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
+    if (typeof window !== "undefined") {
+      const { polyfill } = require("mobile-drag-drop");
+      const { scrollBehaviourDragImageTranslateOverride } = require("mobile-drag-drop/scroll-behaviour");
+      polyfill({
+        dragImageTranslateOverride: scrollBehaviourDragImageTranslateOverride,
+        holdToDrag: 250
+      });
+      // Important to let mobile-drag-drop handle scroll events during drag
+      const onTouchMove = (e: any) => {};
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
+      return () => {
+        window.removeEventListener("touchmove", onTouchMove);
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+      };
+    } else {
+      return () => {
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+      };
+    }
   }, []);
 
   const fetchBinder = async () => {
@@ -295,51 +314,55 @@ export default function BinderPage() {
   const rightPageCards = binder.cards.filter((c) => c.pageNumber === rightPage);
 
   return (
-    <div className="min-h-screen p-6">
-      <header className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.push("/dashboard")} className="text-gray-400 hover:text-white bg-transparent border-none text-base cursor-pointer">
+    <div className="min-h-screen p-4 md:p-6">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto">
+          <button onClick={() => router.push("/dashboard")} className="text-gray-400 hover:text-white bg-transparent border-none text-sm md:text-base cursor-pointer shrink-0">
             ← Back
           </button>
-          <h1 className="text-2xl font-bold font-archivo">{binder.name}</h1>
+          <h1 className="text-xl md:text-2xl font-bold font-archivo truncate max-w-[200px] sm:max-w-none">{binder.name}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto justify-start md:justify-end">
           <button 
             onClick={() => {
               const url = `${window.location.origin}/share/${binder.id}`;
               navigator.clipboard.writeText(url);
               alert("Share link copied to clipboard!");
             }} 
-            className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-4 py-2 rounded-lg cursor-pointer"
+            className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-3 py-1.5 md:px-4 md:py-2 text-sm md:text-base rounded-lg cursor-pointer flex items-center gap-1"
           >
-            🔗 Share
+            <span className="sm:hidden" title="Share">🔗</span>
+            <span className="hidden sm:inline">🔗 Share</span>
           </button>
-          <button onClick={() => setShowSettings(true)} className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-4 py-2 rounded-lg cursor-pointer">
-            ⚙ Settings
+          <button onClick={() => setShowSettings(true)} className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-3 py-1.5 md:px-4 md:py-2 text-sm md:text-base rounded-lg cursor-pointer flex items-center gap-1">
+            <span className="sm:hidden" title="Settings">⚙</span>
+            <span className="hidden sm:inline">⚙ Settings</span>
           </button>
-          <UserAvatar name={session?.user?.name || session?.user?.email} className="w-9 h-9" />
-          <button onClick={() => signOut()} className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-4 py-2 rounded-lg cursor-pointer">
-            Sign Out
-          </button>
+          <div className="flex items-center gap-2 ml-auto md:ml-0">
+            <UserAvatar name={session?.user?.name || session?.user?.email} className="w-8 h-8 md:w-9 md:h-9 shrink-0" />
+            <button onClick={() => signOut()} className="bg-transparent border border-gray-700 text-gray-400 hover:text-white px-3 py-1.5 md:px-4 md:py-2 text-sm md:text-base rounded-lg cursor-pointer whitespace-nowrap">
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-[1400px] mx-auto w-full">
-        <div className="flex justify-center items-center gap-6 mb-6">
+        <div className="flex justify-center items-center gap-3 md:gap-6 mb-6">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 2))}
             disabled={currentPage === 1}
-            className="bg-[#0f0f23] border border-gray-700 text-gray-200 px-5 py-2.5 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[#0f0f23] border border-gray-700 text-gray-200 px-3 py-2 md:px-5 md:py-2.5 text-sm md:text-base rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ← Prev
           </button>
-          <span className="text-lg font-semibold">
+          <span className="text-sm md:text-lg font-semibold">
             Pages {leftPage}-{rightPage > binder.pages ? binder.pages : rightPage} of {binder.pages}
           </span>
           <button
             onClick={() => setCurrentPage((p) => Math.min(binder.pages, p + 2))}
             disabled={rightPage >= binder.pages}
-            className="bg-[#0f0f23] border border-gray-700 text-gray-200 px-5 py-2.5 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[#0f0f23] border border-gray-700 text-gray-200 px-3 py-2 md:px-5 md:py-2.5 text-sm md:text-base rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Next →
           </button>
