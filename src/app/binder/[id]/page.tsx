@@ -368,6 +368,16 @@ export default function BinderPage() {
           </button>
         </div>
 
+        <div className="flex justify-center items-center gap-4 mb-4 text-sm">
+          <span className="text-green-400 font-semibold">
+            Have: {binder.cards.filter(c => c.status === "owned").length}
+          </span>
+          <span className="text-gray-600">·</span>
+          <span className="text-amber-500 font-semibold">
+            Wish: {binder.cards.filter(c => c.status === "wish").length}
+          </span>
+        </div>
+
         {/* mobile stack flex-col, tablet/desktop side-by-side md:flex-row */}
         <div className="flex flex-col md:flex-row gap-6 justify-center">
           <div className="w-full md:w-[calc(50%-12px)] max-w-[600px] flex-none">
