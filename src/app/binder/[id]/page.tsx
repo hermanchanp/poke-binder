@@ -58,18 +58,50 @@ export default function BinderPage() {
   
   const [draggedSlot, setDraggedSlot] = useState<{ page: number; index: number } | null>(null);
 
+  // Set browser
+  const [showSetBrowser, setShowSetBrowser] = useState(false);
+  const [allSets, setAllSets] = useState<{ id: string; name: string; logo?: string; cardCount: { total: number } }[]>([]);
+  const [setsLoading, setSetsLoading] = useState(false);
+  const [setBrowserSearch, setSetBrowserSearch] = useState("");
+
   const rarities = [
-    { label: "Common", value: "common" },
-    { label: "Uncommon", value: "uncommon" },
-    { label: "Rare", value: "rare" },
-    { label: "Holo Rare", value: "holo" },
-    { label: "Ultra Rare", value: "ultra" },
-    { label: "Illustration Rare", value: "illustration" },
-    { label: "Special Illustration Rare", value: "special illustration" },
-    { label: "Secret Rare", value: "secret" },
-    { label: "Shiny Rare", value: "shiny" },
-    { label: "Radiant Rare", value: "radiant" },
-    { label: "Amazing Rare", value: "amazing" },
+    { label: "Common", value: "Common" },
+    { label: "Uncommon", value: "Uncommon" },
+    { label: "Rare", value: "Rare" },
+    { label: "Rare Holo", value: "Rare Holo" },
+    { label: "Holo Rare", value: "Holo Rare" },
+    { label: "Holo Rare V", value: "Holo Rare V" },
+    { label: "Holo Rare VMAX", value: "Holo Rare VMAX" },
+    { label: "Holo Rare VSTAR", value: "Holo Rare VSTAR" },
+    { label: "Double Rare", value: "Double rare" },
+    { label: "Ultra Rare", value: "Ultra Rare" },
+    { label: "Illustration Rare", value: "Illustration rare" },
+    { label: "Special Illustration Rare", value: "Special illustration rare" },
+    { label: "Hyper Rare", value: "Hyper rare" },
+    { label: "Secret Rare", value: "Secret Rare" },
+    { label: "Full Art Trainer", value: "Full Art Trainer" },
+    { label: "ACE SPEC Rare", value: "ACE SPEC Rare" },
+    { label: "Shiny Rare", value: "Shiny rare" },
+    { label: "Shiny Rare V", value: "Shiny rare V" },
+    { label: "Shiny Rare VMAX", value: "Shiny rare VMAX" },
+    { label: "Shiny Ultra Rare", value: "Shiny Ultra Rare" },
+    { label: "Radiant Rare", value: "Radiant Rare" },
+    { label: "Amazing Rare", value: "Amazing Rare" },
+    { label: "Rare PRIME", value: "Rare PRIME" },
+    { label: "Rare Holo LV.X", value: "Rare Holo LV.X" },
+    { label: "LEGEND", value: "LEGEND" },
+    { label: "Crown Rare", value: "Crown" },
+    { label: "Classic Collection", value: "Classic Collection" },
+    { label: "Black White Rare", value: "Black White Rare" },
+    { label: "1 Diamond", value: "One Diamond" },
+    { label: "2 Diamond", value: "Two Diamond" },
+    { label: "3 Diamond", value: "Three Diamond" },
+    { label: "4 Diamond", value: "Four Diamond" },
+    { label: "1 Star", value: "One Star" },
+    { label: "2 Star", value: "Two Star" },
+    { label: "3 Star", value: "Three Star" },
+    { label: "1 Shiny", value: "One Shiny" },
+    { label: "2 Shiny", value: "Two Shiny" },
   ];
 
   useEffect(() => {
@@ -200,6 +232,20 @@ export default function BinderPage() {
     if (searchQuery) {
       searchCards(searchQuery, 1);
     }
+  };
+
+  const openSetBrowser = async () => {
+    setShowSetBrowser(true);
+    if (allSets.length > 0) return;
+    setSetsLoading(true);
+    try {
+      const res = await fetch("https://api.tcgdex.net/v2/en/sets");
+      const data = await res.json();
+      setAllSets(data);
+    } catch {
+      // leave empty
+    }
+    setSetsLoading(false);
   };
 
   const addCard = async (card: SearchResult) => {
@@ -539,13 +585,22 @@ export default function BinderPage() {
                 autoFocus={!editingCard}
               />
               <div className="flex flex-wrap sm:flex-nowrap gap-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="Set (e.g. swsh)..."
-                  value={setFilter}
-                  onChange={(e) => { setSetFilter(e.target.value); handleFilterChange(); }}
-                  className="flex-1 min-w-[120px] p-3 bg-[#0f0f23] border border-gray-700 rounded-lg text-gray-200 text-sm focus:border-[#e94560] focus:outline-none"
-                />
+                <div className="flex flex-1 min-w-[120px] gap-1">
+                  <input
+                    type="text"
+                    placeholder="Set ID (e.g. swsh1, sv1)..."
+                    value={setFilter}
+                    onChange={(e) => { setSetFilter(e.target.value); handleFilterChange(); }}
+                    className="flex-1 p-3 bg-[#0f0f23] border border-gray-700 rounded-lg text-gray-200 text-sm focus:border-[#e94560] focus:outline-none"
+                  />
+                  <button
+                    onClick={openSetBrowser}
+                    title="Browse sets"
+                    className="px-3 bg-[#0f0f23] border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-gray-500 text-sm whitespace-nowrap transition-colors"
+                  >
+                    Browse
+                  </button>
+                </div>
                 <input
                   type="text"
                   placeholder="Card #..."
@@ -688,6 +743,79 @@ export default function BinderPage() {
               >
                 Save
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSetBrowser && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[200]"
+          onClick={() => setShowSetBrowser(false)}
+        >
+          <div
+            className="bg-[#1a1a2e] rounded-xl w-[90vw] max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <h3 className="text-lg font-bold font-archivo">Browse Sets</h3>
+              <button
+                onClick={() => setShowSetBrowser(false)}
+                className="text-gray-400 hover:text-white text-2xl leading-none bg-transparent border-none cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-5 py-3 border-b border-gray-800">
+              <input
+                type="text"
+                placeholder="Search sets..."
+                value={setBrowserSearch}
+                onChange={(e) => setSetBrowserSearch(e.target.value)}
+                autoFocus
+                className="w-full p-3 bg-[#0f0f23] border border-gray-700 rounded-lg text-gray-200 text-sm focus:border-[#e94560] focus:outline-none"
+              />
+            </div>
+            <div className="overflow-y-auto flex-1 p-3">
+              {setsLoading ? (
+                <div className="text-center py-12 text-gray-400">Loading sets...</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {allSets
+                    .filter((s) => {
+                      const q = setBrowserSearch.toLowerCase();
+                      return !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+                    })
+                    .map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setSetFilter(s.id);
+                          setShowSetBrowser(false);
+                          if (searchQuery) searchCards(searchQuery, 1);
+                        }}
+                        className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors cursor-pointer bg-[#0f0f23] hover:border-[#e94560] hover:bg-[#16213e]
+                          ${setFilter === s.id ? "border-[#e94560] bg-[#16213e]" : "border-gray-800"}
+                        `}
+                      >
+                        {s.logo ? (
+                          <img
+                            src={`${s.logo}.png`}
+                            alt={s.name}
+                            className="h-8 w-16 object-contain shrink-0"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ) : (
+                          <div className="h-8 w-16 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-gray-200 text-sm font-medium truncate">{s.name}</div>
+                          <div className="text-gray-500 text-xs font-mono">{s.id} · {s.cardCount.total} cards</div>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
